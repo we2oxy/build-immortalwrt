@@ -1,0 +1,19 @@
+
+config ddns 'global'
+	option ddns_dateformat '%F %R'
+	option ddns_loglines '250'
+	option upd_privateip '0'
+
+config service 'myddns_ipv4'
+	option service_name 'aliyun.com'
+	option lookup_host 'r2s.site'
+	option domain '@.r2s.site'
+	option username ''
+	option password ''
+	option interface 'lan'
+	option ip_source 'web'
+	option force_interval '30'
+	option force_unit 'minutes'
+	option retry_interval '180'
+	option enabled '1'
+

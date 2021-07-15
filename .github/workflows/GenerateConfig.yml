@@ -1,0 +1,179 @@
+name:  GenerateConfig
+
+on:
+  repository_dispatch:
+  workflow_dispatch:
+    inputs:
+      ssh:
+        description: 'SSH connection to Actions'
+        required: false
+        default: 'true'
+      commit:
+        description: 'Commit file'
+        required: false
+        default: 'true'
+      push:
+        description: 'Push changes'
+        required: false
+        default: 'true'
+        
+jobs:
+  GenerateConfig:
+    runs-on: ubuntu-18.04
+    steps:
+    
+    - name: Checkout Repository
+      uses: actions/checkout@v2
+      
+    - name: Init Building Dependencies
+      env:
+        DEBIAN_FRONTEND: noninteractive
+        TZ: Asia/Shanghai
+      run: |
+        sudo timedatectl set-timezone "$TZ"
+        echo "Init Building":$(date +%F_%H%M%S)
+        #docker rmi $(docker images -q)
+        #sudo -E apt-get remove -y --purge azure-cli ghc zulu* hhvm llvm* firefox google* dotnet* powershell mysql* php* mssql-tools msodbcsql17 android*
+        #sudo -E apt-get autoremove -y --purge
+        #sudo -E apt-get clean -y
+        #sudo -E swapoff -a
+        #sudo -E rm -rf /usr/share/dotnet /etc/mysql /etc/php /usr/local/lib/android /opt/ghc /swapfile
+        
+    - name: immortalwrt Source
+      run: |
+        echo "Clone Source":$(date +%F_%H%M%S)
+        df -hP
+        mkdir -v /home/runner/upload
+        cd "/home/runner"
+        git clone --branch "openwrt-18.06-k5.4" --single-branch "https://github.com/immortalwrt/immortalwrt" "immortalwrt-1806-k54"
+        git clone --branch "openwrt-18.06" --single-branch "https://github.com/immortalwrt/immortalwrt" "immortalwrt-1806"
+        git clone --branch "1806-rockchip-419" --single-branch "https://github.com/1715173329/immortalwrt.git" "1806-rockchip-419"
+        git clone https://github.com/we2oxy/Build-Immortalwrt.git 
+        sudo chown -R runner:runner upload/ immortalwrt-1806-k54/ immortalwrt-1806/ 1806-rockchip-419/  Build-Immortalwrt/
+        df -hP
+        
+    - name: feeds 1806 k54
+      run: |
+        echo "feeds 1806 k54":$(date +%F_%H%M%S)
+        cd "/home/runner/immortalwrt-1806-k54"
+        rm -rf tmp/
+        ls -lash
+        ./scripts/feeds update -a
+        ./scripts/feeds install -a
+        cp -f ${GITHUB_WORKSPACE}/buildinfo/immortalwrt/R2S-config.buildinfo /home/runner/immortalwrt-1806-k54/.config
+        ls -lash
+        
+    - name: feeds immortalwrt 1806
+      run: |
+        echo "feeds immortalwrt 1806":$(date +%F_%H%M%S)
+        cd "/home/runner/immortalwrt-1806"
+        rm -rf tmp/
+        ls -lash
+        ./scripts/feeds update -a
+        ./scripts/feeds install -a
+        cp -f ${GITHUB_WORKSPACE}/buildinfo/immortalwrt/x64-config.buildinfo  /home/runner/immortalwrt-1806/.config
+        ls -lash
+
+    - name: feeds rockchip 419
+      run: |
+        echo "feeds rockchip 419":$(date +%F_%H%M%S)
+        cd "/home/runner/1806-rockchip-419"
+        rm -rf tmp/
+        ls -lash
+        ./scripts/feeds update -a
+        ./scripts/feeds install -a
+        cp -f ${GITHUB_WORKSPACE}/buildinfo/immortalwrt/rockchip-K4_19-config.buildinfo "/home/runner/1806-rockchip-419/.config"
+        ls -lash
+
+    - name: SSH connection to Actions
+      uses: P3TERX/ssh2actions@v1.0.0
+      if: (github.event.inputs.ssh == 'true' && github.event.inputs.ssh  != 'false') || contains(github.event.action, 'ssh')
+      env:
+        TELEGRAM_CHAT_ID: ${{ secrets.TELEGRAM_CHAT_ID }}
+        TELEGRAM_BOT_TOKEN: ${{ secrets.TELEGRAM_BOT_TOKEN }}
+
+    - name: Generate config 
+      run: |
+        cd "/home/runner/immortalwrt-1806-k54"
+        make defconfig 
+        ls -lash
+        ./scripts/diffconfig.sh > R2S-config.buildinfo
+        cp R2S-config.buildinfo /home/runner/upload/R2S-config.buildinfo
+        pwd
+        cat R2S-config.buildinfo
+        wc -l R2S-config.buildinfo
+        echo "Generate Config immortalwrt-1806-k54 Successful":$(date +%F_%H%M%S)
+        cd "/home/runner/immortalwrt-1806"
+        make defconfig 
+        ./scripts/diffconfig.sh > x64-config.buildinfo
+        cp x64-config.buildinfo /home/runner/upload/x64-config.buildinfo
+        pwd
+        cat x64-config.buildinfo
+        wc -l x64-config.buildinfo
+        echo "Generate Config immortalwrt-1806 Successful":$(date +%F_%H%M%S)
+        cd "/home/runner/1806-rockchip-419"
+        make defconfig 
+        ./scripts/diffconfig.sh > rockchip-K4_19-config.buildinfo
+        cp rockchip-K4_19-config.buildinfo /home/runner/upload/rockchip-K4_19-config.buildinfo
+        pwd
+        cat rockchip-K4_19-config.buildinfo
+        wc -l rockchip-K4_19-config.buildinfo
+        echo "Generate Config 1806-rockchip-419 Successful":$(date +%F_%H%M%S)
+        
+    - name: Prepare artifact
+      run: |
+        echo "Prepare artifact":$(date +%F_%H%M%S)
+        cd /home/runner/upload/ && ls -lash
+        wc -l ./*
+        
+    - name: Clone My source
+      run: |
+        echo "Clone My source":$(date +%F_%H%M%S)
+        cd /home/runner/Build-Immortalwrt/
+        for source_name in `ls *.buildinfo`;do tag_name=$(date +%F_%H%M%S)_  modify_name=$tag_name$source_name;mv $source_name $modify_name;done
+        cp /home/runner/upload/*.buildinfo ./
+        ls -lah
+
+    - name: Commit file
+      if: (github.event.inputs.commit == 'true' && github.event.inputs.commit  != 'false') 
+      run: |
+        echo "Commit file":$(date +%F_%H%M%S)
+        git config --global user.email we2oxy@gmail.com
+        git config --global user.name we2oxy
+        git add -A
+        git commit -m "Update `date +%F_%H%M%S`" -a
+        
+    - name: Push changes
+      if: (github.event.inputs.push == 'true' && github.event.inputs.push  != 'false') 
+      uses: ad-m/github-push-action@master
+      with:
+        github_token: ${{ secrets.GITHUB_TOKEN }}
+        branch: ${{ github.ref }}
+        
+    - name: Deliver buildinfo
+      uses: actions/upload-artifact@v2
+      with:
+        name: OpenWrt_buildinfo
+        path: /home/runner/upload/
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+

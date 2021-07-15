@@ -1,0 +1,18 @@
+
+config cifs
+	option workgroup 'WORKGROUP'
+	option iocharset 'utf8'
+	option delay '5'
+	option mountarea '/mnt'
+	option enabled '1'
+
+config natshare
+	option smbver '2.0'
+	option iocharset 'utf8'
+	option server '10.0.0.12'
+	option name 'ftp'
+	option natpath '/ftp'
+	option agm 'rw'
+	option users 'op'
+	option pwd 'op99'
+
