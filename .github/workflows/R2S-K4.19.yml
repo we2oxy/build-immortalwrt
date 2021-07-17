@@ -9,7 +9,7 @@ on:
         required: false
         default: 'false'
   schedule:
-    - cron:  '0 18 */5 * *'
+    - cron:  '40 18 */5 * *'
 env:
   REPO_URL:  https://github.com/1715173329/immortalwrt.git
   REPO_BRANCH:  1806-rockchip-419
